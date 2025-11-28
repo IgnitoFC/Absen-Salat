@@ -1,0 +1,50 @@
+<!DOCTYPE html><html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>QR Generator Siswa</title><script src="https://cdn.jsdelivr.net/npm/qrcodejs/qrcode.min.js"></script><style>
+body {
+  font-family: Arial, sans-serif;
+  text-align: center;
+  margin-top: 40px;
+}
+input {
+  width: 250px;
+  padding: 10px;
+  margin: 10px;
+  font-size: 16px;
+}
+button {
+  padding: 10px 20px;
+  font-size: 16px;
+  background: #007bff;
+  color: white;
+  border: none;
+  border-radius: 5px;
+}
+#qrcode {
+  margin-top: 20px;
+}
+</style></head>
+<body><h2>Pembuat QR Kartu Siswa</h2><input id="uid" placeholder="UID Siswa (contoh: 001)" /><br>
+<input id="nama" placeholder="Nama Siswa" /><br>
+
+<button onclick="generateQR()">Generate QR</button>
+
+<div id="qrcode"></div><script>
+function generateQR() {
+  let uid = document.getElementById("uid").value;
+  let nama = document.getElementById("nama").value;
+
+  if (!uid || !nama) {
+    alert("Isi UID dan Nama!");
+    return;
+  }
+
+  let data = JSON.stringify({ uid: uid, nama: nama });
+
+  document.getElementById("qrcode").innerHTML = "";
+  new QRCode(document.getElementById("qrcode"), data);
+}
+</script></body>
+</html>
