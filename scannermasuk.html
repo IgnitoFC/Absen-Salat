@@ -1,0 +1,111 @@
+<!-- scannerMasuk.html -->
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Scanner Masuk - Absen Dzuhur</title>
+<style>
+  body{font-family:system-ui,Arial;display:flex;flex-direction:column;gap:10px;align-items:center;padding:14px;background:#eef4fb}
+  h2{margin:6px}
+  video{width:100%;max-width:420px;border-radius:8px;box-shadow:0 4px 12px rgba(0,0,0,.12)}
+  .status{font-weight:bold}
+  .log{max-width:420px;width:100%;background:#fff;padding:8px;border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,.06)}
+</style>
+</head>
+<body>
+<h2>Scanner Masuk — Absen Salat Dzuhur</h2>
+<p>Scan QR kartu siswa → otomatis tersimpan. (Pastikan rohis login dulu)</p>
+<div id="auth" style="display:none;">
+  <div style="max-width:420px;width:100%;">
+    <label>Nama Petugas: <input id="petugasName" placeholder="Mis: Rohis" style="width:100%;padding:8px"></label>
+    <button id="startBtn">Mulai Scan</button>
+  </div>
+</div>
+
+<video id="video" playsinline></video>
+<div class="log" id="log">Status: menunggu scan...</div>
+
+<!-- jsQR -->
+<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
+<!-- Firebase: gunakan modul compat supaya mudah -->
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
+
+<script>
+/* ========== CONFIG FIREBASE - ISI DENGAN CONFIG ANDA ========== */
+const firebaseConfig = {
+  apiKey: "/* <-- ISI DISINI */",
+  authDomain: "/* <-- ISI DISINI */",
+  databaseURL: "/* <-- ISI_DISINI */",
+  projectId: "/* <-- ISI DISINI */",
+  storageBucket: "/* <-- ISI DISINI */",
+  messagingSenderId: "/* <-- ISI DISINI */",
+  appId: "/* <-- ISI DISINI */"
+};
+/* ============================================================ */
+
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+
+const video = document.getElementById('video');
+const logEl = document.getElementById('log');
+const startBtn = document.getElementById('startBtn');
+const petugasNameInput = document.getElementById('petugasName');
+
+document.getElementById('auth').style.display = 'block';
+
+startBtn.addEventListener('click', async () => {
+  const petugas = petugasNameInput.value.trim();
+  if(!petugas){ alert('Isi nama petugas dulu'); return; }
+  // start camera
+  const stream = await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'}});
+  video.srcObject = stream;
+  video.play();
+  logEl.innerText = 'Camera aktif. Arahkan QR ke kamera...';
+  tickScan(petugas);
+});
+
+function tickScan(petugas){
+  const canvas = document.createElement('canvas');
+  const ctx = canvas.getContext('2d');
+  (function scanLoop(){
+    if(video.readyState !== video.HAVE_ENOUGH_DATA){ requestAnimationFrame(scanLoop); return; }
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    ctx.drawImage(video,0,0,canvas.width,canvas.height);
+    const img = ctx.getImageData(0,0,canvas.width,canvas.height);
+    const code = jsQR(img.data, img.width, img.height);
+    if(code){
+      try{
+        const payload = JSON.parse(code.data);
+        const uid = payload.uid;
+        const nama = payload.nama || 'Unknown';
+        doSaveMasuk(uid, nama, petugas);
+      }catch(e){
+        logEl.innerText = 'QR tidak valid';
+      }
+    }
+    requestAnimationFrame(scanLoop);
+  })();
+}
+
+function doSaveMasuk(uid,nama,petugas){
+  const tanggal = new Date().toISOString().slice(0,10);
+  const jam = new Date().toISOString();
+  const path = `absen/${tanggal}/${uid}`;
+  // write masuk only if not already recorded masuk
+  db.ref(path + '/masuk').get().then(snap=>{
+    if(snap.exists()){
+      logEl.innerText = `${nama} (${uid}) sudah tercatat masuk pukul ${snap.val()}`;
+      return;
+    }
+    const data = {masuk: jam, nama, petugasMasuk:petugas};
+    db.ref(path).update(data).then(()=>{
+      logEl.innerText = `Tercatat MASUK: ${nama} (${uid}) — ${jam}`;
+    }).catch(err=>{ logEl.innerText = 'Error simpan: '+err; });
+  });
+}
+</script>
+</body>
+</html>
