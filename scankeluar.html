@@ -1,0 +1,62 @@
+<!DOCTYPE html><html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Scan Selesai Salat</title><script src="https://unpkg.com/html5-qrcode"></script><script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app.js"></script><script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database.js"></script><style>
+body {
+  font-family: Arial, sans-serif;
+  text-align: center;
+  background: #f5f5f5;
+}
+h2 { margin-top: 20px; }
+#reader {
+  width: 300px;
+  margin: auto;
+  margin-top: 20px;
+}
+.msg {
+  font-weight: bold;
+  margin-top: 25px;
+}
+</style></head>
+<body><h2>SCAN SELESAI SALAT</h2>
+<div id="reader"></div>
+<div class="msg" id="msg"></div><script>
+// Firebase Config (ISI SETELAH KAMU KASIH SAYA KONFIG)
+const firebaseConfig = {
+  apiKey: "ISI",
+  authDomain: "ISI",
+  databaseURL: "ISI",
+  projectId: "ISI",
+  storageBucket: "ISI",
+  messagingSenderId: "ISI",
+  appId: "ISI"
+};
+
+const app = firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+
+function tanggal() {
+  let t = new Date();
+  return `${t.getFullYear()}-${String(t.getMonth()+1).padStart(2,'0')}-${String(t.getDate()).padStart(2,'0')}`;
+}
+
+function onScanSuccess(decodedText) {
+  let data = JSON.parse(decodedText);
+
+  let waktu = new Date().toLocaleTimeString("id-ID", { hour12: false });
+  let tgl = tanggal();
+
+  firebase.database().ref("absen/" + tgl + "/" + data.uid).update({
+    nama: data.nama,
+    keluar: waktu
+  });
+
+  document.getElementById("msg").innerHTML =
+    "✔ SELESAI TERCATAT<br>" + data.nama + "<br>Jam: " + waktu;
+}
+
+let scanner = new Html5QrcodeScanner("reader", { fps: 10, qrbox: 250 });
+scanner.render(onScanSuccess);
+</script></body>
+</html>
