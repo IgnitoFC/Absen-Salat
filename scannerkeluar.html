@@ -1,0 +1,100 @@
+<!-- scannerKeluar.html -->
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Scanner Keluar - Absen Dzuhur</title>
+<style>
+  body{font-family:system-ui,Arial;display:flex;flex-direction:column;gap:10px;align-items:center;padding:14px;background:#fff7f0}
+  h2{margin:6px}
+  video{width:100%;max-width:420px;border-radius:8px}
+  .log{max-width:420px;width:100%;background:#fff;padding:8px;border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,.06)}
+</style>
+</head>
+<body>
+<h2>Scanner Keluar — Absen Selesai Salat</h2>
+<p>Scan QR kartu siswa yang sama saat keluar.</p>
+<div>
+  <label>Nama Petugas: <input id="petugasName" placeholder="Mis: Rohis" /></label>
+  <button id="startBtn">Mulai Scan</button>
+</div>
+
+<video id="video" playsinline></video>
+<div class="log" id="log">Status: menunggu scan...</div>
+
+<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
+
+<script>
+/* ========== CONFIG FIREBASE - ISI DENGAN CONFIG ANDA ========== */
+const firebaseConfig = {
+  apiKey: "/* <-- ISI DISINI */",
+  authDomain: "/* <-- ISI DISINI */",
+  databaseURL: "/* <-- ISI_DISINI */",
+  projectId: "/* <-- ISI DISINI */",
+  storageBucket: "/* <-- ISI DISINI */",
+  messagingSenderId: "/* <-- ISI DISINI */",
+  appId: "/* <-- ISI DISINI */"
+};
+/* ============================================================ */
+
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+
+const video = document.getElementById('video');
+const logEl = document.getElementById('log');
+const startBtn = document.getElementById('startBtn');
+
+startBtn.addEventListener('click', async ()=>{
+  const petugas = document.getElementById('petugasName').value.trim();
+  if(!petugas){ alert('Isi nama petugas dulu'); return; }
+  const stream = await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'}});
+  video.srcObject = stream;
+  video.play();
+  logEl.innerText = 'Camera aktif. Arahkan QR ke kamera...';
+  scanLoop(petugas);
+});
+
+function scanLoop(petugas){
+  const canvas = document.createElement('canvas');
+  const ctx = canvas.getContext('2d');
+  (function loop(){
+    if(video.readyState !== video.HAVE_ENOUGH_DATA){ requestAnimationFrame(loop); return; }
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    ctx.drawImage(video,0,0,canvas.width,canvas.height);
+    const img = ctx.getImageData(0,0,canvas.width,canvas.height);
+    const code = jsQR(img.data, img.width, img.height);
+    if(code){
+      try{
+        const payload = JSON.parse(code.data);
+        const uid = payload.uid;
+        const nama = payload.nama || 'Unknown';
+        doSaveKeluar(uid,nama,petugas);
+      }catch(e){
+        logEl.innerText = 'QR tidak valid';
+      }
+    }
+    requestAnimationFrame(loop);
+  })();
+}
+
+function doSaveKeluar(uid,nama,petugas){
+  const tanggal = new Date().toISOString().slice(0,10);
+  const jam = new Date().toISOString();
+  const path = `absen/${tanggal}/${uid}`;
+  db.ref(path + '/keluar').get().then(snap=>{
+    if(snap.exists()){
+      logEl.innerText = `${nama} (${uid}) sudah tercatat keluar pukul ${snap.val()}`;
+      return;
+    }
+    db.ref(path).update({keluar: jam, petugasKeluar: petugas}).then(()=>{
+      logEl.innerText = `Tercatat KELUAR: ${nama} (${uid}) — ${jam}`;
+    }).catch(err=> logEl.innerText = 'Error simpan: '+err);
+  });
+}
+</script>
+</body>
+</html>
